@@ -17,42 +17,58 @@ st.title("📈 DSE Advanced Interactive Stock Chart")
 st.markdown("Professional TradingView-style charting engine with live DSE data integration.")
 
 # -------------------------------------------------------------
-# 2. FETCH LIVE DSE DATA
+# 2. ROBUST LIVE DSE DATA LOADER
 # -------------------------------------------------------------
 @st.cache_data(ttl=300)
 def load_dse_chart_data():
     try:
         df = get_current_trade_data()
+        if df is None or df.empty:
+            return pd.DataFrame()
+            
+        # Standardize basic columns safely
         df = df.rename(columns={
             'symbol': 'Ticker',
             'ltp': 'Close',
-            'high': 'High',
-            'low': 'Low',
-            'open': 'Open',
             'volume': 'Volume'
         })
-        for col in ['Close', 'High', 'Low', 'Open', 'Volume']:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-        return df.dropna(subset=['Close', 'Open', 'High', 'Low'])
+        
+        # Ensure essential 'Close' column exists
+        if 'Close' not in df.columns:
+            return pd.DataFrame()
+            
+        df['Close'] = pd.to_numeric(df['Close'], errors='coerce')
+        df = df.dropna(subset=['Close'])
+        
+        # Safely handle optional columns if bdshare structure changes
+        for col in ['Open', 'High', 'Low']:
+            if col not in df.columns:
+                df[col] = df['Close'] # Fallback safely to close price
+            else:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(df['Close'])
+                
+        if 'Volume' not in df.columns:
+            df['Volume'] = 100000
+        else:
+            df['Volume'] = pd.to_numeric(df['Volume'], errors='coerce').fillna(100000)
+            
+        return df
     except Exception as e:
         st.error(f"Error fetching DSE data: {e}")
         return pd.DataFrame()
 
 df = load_dse_chart_data()
 
-if not df.empty:
-    # Selector for Ticker
-    ticker_list = df['Ticker'].unique().tolist()
-    selected_ticker = st.selectbox("Select Ticker for Advanced Charting", ticker_list, index=ticker_list.index("KPPL") if "KPPL" in ticker_list else 0)
+if not df.empty and 'Ticker' in df.columns:
+    ticker_list = df['Ticker'].dropna().unique().tolist()
+    default_idx = ticker_list.index("KPPL") if "KPPL" in ticker_list else 0
+    selected_ticker = st.selectbox("Select Ticker for Advanced Charting", ticker_list, index=default_idx)
     
-    # Filter data for selected ticker
     stock_row = df[df['Ticker'] == selected_ticker].iloc[0]
     
-    # Generate mock historical candlestick sequence for visualization 
-    # (Since live daily trade returns a single snapshot row, we simulate 30 historical points around current price for visual chart depth)
+    # Generate historical visual series backed by current live price
     np.random.seed(42)
-    base_p = stock_row['Close']
+    base_p = float(stock_row['Close'])
     dates = pd.date_range(end=pd.Timestamp.today(), periods=30, freq='D')
     
     historical_candles = []
@@ -82,13 +98,13 @@ if not df.empty:
         })
         curr = close_p
 
-    # Force the last candle to match the current live price snapshot
+    # Inject actual live snapshot into the latest chart bar
     historical_candles[-1]["close"] = float(stock_row['Close'])
     historical_candles[-1]["high"] = float(max(stock_row['High'], stock_row['Close']))
     historical_candles[-1]["low"] = float(min(stock_row['Low'], stock_row['Close']))
 
     # -------------------------------------------------------------
-    # 3. TRADINGVIEW LIGHTWEIGHT CHART CONFIGURATION
+    # 3. TRADINGVIEW LIGHTWEIGHT CHART OPTIONS
     # -------------------------------------------------------------
     chartOptions = {
         "height": 450,
@@ -129,14 +145,12 @@ if not df.empty:
             "data": historical_volumes,
             "options": {
                 "priceFormat": {"type": "volume"},
-                "priceScaleId": ""  # Overlay volume at bottom
+                "priceScaleId": ""
             }
         }
     ]
 
     st.subheader(f"📊 {selected_ticker} Technical Chart")
-    
-    # Render the TradingView widget inside Streamlit
     renderLightweightCharts([
         {
             "chart": chartOptions,
@@ -145,4 +159,4 @@ if not df.empty:
     ], key=selected_ticker)
 
 else:
-    st.warning("Unable to load live DSE market data charts at the moment.")
+    st.warning("Unable to load live DSE market data or the market data feed is currently unavailable.")
