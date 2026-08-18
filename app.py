@@ -3,20 +3,43 @@ import pandas as pd
 import numpy as np
 
 # -------------------------------------------------------------
-# 1. PAGE CONFIGURATION & MOBILE OPTIMIZATION
+# 1. APP CONFIGURATION
 # -------------------------------------------------------------
 st.set_page_config(
-    page_title="DSE Hot Stock Screener", 
-    page_icon="📈", 
-    layout="wide"
+    page_title="Advanced DSE Tech Analyzer", 
+    layout="wide", 
+    page_icon="📈"
 )
 
-st.title("🔥 DSE Hot Stock & Technical Screener")
-st.markdown("Advanced multi-tier screening funnel with built-in technical analysis (RSI, EMA, Momentum).")
+st.title("🚀 Advanced DSE Technical Analysis Engine")
+st.markdown("Professional quantitative screening framework incorporating MACD, Bollinger Bands, ATR Volatility, and Momentum Oscillators.")
 
 # -------------------------------------------------------------
-# 2. TECHNICAL ANALYSIS FUNCTIONS (Pure Pandas/Numpy Engine)
+# 2. ADVANCED MATHEMATICAL INDICATOR FUNCTIONS
 # -------------------------------------------------------------
+def calculate_macd(series, fast=12, slow=26, signal=9):
+    exp1 = series.ewm(span=fast, adjust=False).mean()
+    exp2 = series.ewm(span=slow, adjust=False).mean()
+    macd_line = exp1 - exp2
+    signal_line = macd_line.ewm(span=signal, adjust=False).mean()
+    histogram = macd_line - signal_line
+    return macd_line, signal_line, histogram
+
+def calculate_bollinger_bands(series, window=20, num_std=2):
+    middle_band = series.rolling(window=window).mean()
+    std_dev = series.rolling(window=window).std()
+    upper_band = middle_band + (num_std * std_dev)
+    lower_band = middle_band - (num_std * std_dev)
+    return upper_band, middle_band, lower_band
+
+def calculate_atr(high, low, close, window=14):
+    tr1 = high - low
+    tr2 = abs(high - close.shift())
+    tr3 = abs(low - close.shift())
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    atr = tr.rolling(window=window).mean()
+    return atr
+
 def calculate_rsi(series, period=14):
     delta = series.diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
@@ -24,134 +47,125 @@ def calculate_rsi(series, period=14):
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
-def calculate_ema(series, span):
-    return series.ewm(span=span, adjust=False).mean()
-
 # -------------------------------------------------------------
-# 3. DATA ENGINE (Google Sheets Connector or Mock Engine)
+# 3. MOCK DSE DATA GENERATION & MATRIX MAPPING
 # -------------------------------------------------------------
 @st.cache_data(ttl=300)
-def load_stock_data():
-    # You can replace this URL later with your published Google Sheet CSV link
-    np.random.seed(42)
-    tickers = ["KPPL", "SQURPHARMA", "BATBC", "RENATA", "BEACONPHAR", "LANKABANGL", "BXPHARMA", "OLYMPIC", "Grameenphone", "BEXIMCO"] + [f"STOCK_{i}" for i in range(11, 60)]
-    
+def load_advanced_dse_data():
+    np.random.seed(101)
+    tickers = ["KPPL", "SQURPHARMA", "BATBC", "RENATA", "BEACONPHAR", "LANKABANGL", "BXPHARMA", "OLYMPIC"] + [f"DSE_STK_{i}" for i in range(9, 50)]
     n = len(tickers)
-    base_prices = np.random.uniform(20, 400, n)
     
-    df = pd.DataFrame({
-        'Ticker': tickers,
-        'Category': np.random.choice(['A', 'B', 'N'], n, p=[0.7, 0.2, 0.1]),
-        'Close_Price': base_prices,
-        'PaidUp_Mn': np.random.uniform(200, 3000, n),
-        'Volume_Today': np.random.uniform(50000, 2500000, n),
-        'Volume_20D_Avg': np.random.uniform(40000, 2000000, n),
-        'PE_Ratio': np.random.uniform(6, 35, n),
-        'Div_Yield': np.random.uniform(0, 8, n)
-    })
-    
-    # Simulate historical price series for technical indicators
-    simulated_history = []
-    for price in df['Close_Price']:
-        hist = price * (1 + np.random.normal(0, 0.015, 50).cumsum())
-        simulated_history.append(pd.Series(hist))
-    
-    df['RSI_14'] = [calculate_rsi(h).iloc[-1] for h in simulated_history]
-    df['EMA_50'] = [calculate_ema(h, 50).iloc[-1] for h in simulated_history]
-    df['EMA_200'] = [calculate_ema(h, 200).iloc[-1] for h in simulated_history]
-    df['Vol_Spike_Ratio'] = df['Volume_Today'] / df['Volume_20D_Avg']
-    
-    return df
+    data = []
+    for ticker in tickers:
+        base_price = np.random.uniform(20, 450)
+        # Generate 60 days of synthetic price movement
+        price_series = base_price * (1 + np.random.normal(0.001, 0.02, 60).cumsum())
+        high_series = price_series * np.random.uniform(1.002, 1.018, 60)
+        low_series = price_series * np.random.uniform(0.982, 0.998, 60)
+        vol_series = np.random.uniform(40000, 2000000, 60)
+        
+        close_p = pd.Series(price_series)
+        high_p = pd.Series(high_series)
+        low_p = pd.Series(low_series)
+        
+        # Calculate Indicators
+        _, _, hist = calculate_macd(close_p)
+        upper, _, lower = calculate_bollinger_bands(close_p)
+        atr = calculate_atr(high_p, low_p, close_p)
+        rsi = calculate_rsi(close_p)
+        
+        # Determine MACD Crossover Status
+        current_hist = hist.iloc[-1]
+        prev_hist = hist.iloc[-2]
+        if current_hist > 0 and prev_hist <= 0:
+            cross_status = "Bullish Crossover"
+        elif current_hist < 0 and prev_hist >= 0:
+            cross_status = "Bearish Crossover"
+        elif current_hist > 0:
+            cross_status = "Bullish Momentum"
+        else:
+            cross_status = "Bearish Momentum"
 
-raw_df = load_stock_data()
+        data.append({
+            'Ticker': ticker,
+            'Close': close_p.iloc[-1],
+            'RSI_14': rsi.iloc[-1],
+            'MACD_Status': cross_status,
+            'BB_Upper': upper.iloc[-1],
+            'BB_Lower': lower.iloc[-1],
+            'ATR_Volatility': atr.iloc[-1],
+            'Volume_Today': vol_series[-1]
+        })
+        
+    return pd.DataFrame(data)
+
+raw_df = load_advanced_dse_data()
 
 # -------------------------------------------------------------
-# 4. MOBILE SIDEBAR: THE ADVANCED SCREENING FUNNEL
+# 4. SIDEBAR FILTER CONTROLS
 # -------------------------------------------------------------
-st.sidebar.header("⚙️ Funnel Filters")
+st.sidebar.header("⚙️ Quantitative Funnel")
 
-# Tier 1: Risk & Liquidity
-st.sidebar.subheader("1. Risk & Liquidity")
-selected_cats = st.sidebar.multiselect("Allowed Categories", ['A', 'B', 'N'], default=['A', 'B'])
-min_vol = st.sidebar.number_input("Min Today's Volume", value=100000, step=50000)
+st.sidebar.subheader("Momentum Filters")
+rsi_range = st.sidebar.slider("RSI (14) Range", 0, 100, (40, 75))
+macd_filter = st.sidebar.selectbox("MACD Filter", ["All", "Bullish Crossover", "Bullish Momentum", "Bearish Momentum", "Bearish Crossover"])
 
-# Tier 2: Fundamentals
-st.sidebar.subheader("2. Fundamentals")
-pe_slider = st.sidebar.slider("P/E Ratio Range", 0, 50, (5, 25))
-min_div_yield = st.sidebar.slider("Min Dividend Yield (%)", 0.0, 10.0, 1.0)
-
-# Tier 3: Technical Indicators
-st.sidebar.subheader("3. Technical Setup")
-rsi_slider = st.sidebar.slider("RSI (14) Range", 10, 90, (40, 70))
-require_uptrend = st.sidebar.checkbox("Price Above 50 EMA (Uptrend)", value=True)
-require_vol_surge = st.sidebar.checkbox("Smart Money Volume Surge (>1.2x)", value=True)
+st.sidebar.subheader("Risk & Volatility Management")
+max_atr = st.sidebar.slider("Max ATR Volatility Threshold", 1.0, 30.0, 12.0)
 
 # -------------------------------------------------------------
-# 5. EXECUTE FILTERING LOGIC
+# 5. EXECUTE FILTERING MATRIX
 # -------------------------------------------------------------
 df = raw_df.copy()
 
-df = df[df['Category'].isin(selected_cats)]
-df = df[df['Volume_Today'] >= min_vol]
-df = df[(df['PE_Ratio'] >= pe_slider[0]) & (df['PE_Ratio'] <= pe_slider[1])]
-df = df[df['Div_Yield'] >= min_div_yield]
-df = df[(df['RSI_14'] >= rsi_slider[0]) & (df['RSI_14'] <= rsi_slider[1])]
+df = df[(df['RSI_14'] >= rsi_range[0]) & (df['RSI_14'] <= rsi_range[1])]
+df = df[df['ATR_Volatility'] <= max_atr]
 
-if require_uptrend:
-    df = df[df['Close_Price'] > df['EMA_50']]
-if require_vol_surge:
-    df = df[df['Vol_Spike_Ratio'] >= 1.2]
-
-# Calculate a "Hot Momentum Score" for ranking
-if len(df) > 0:
-    df['Hot_Score'] = (
-        (df['Vol_Spike_Ratio'] * 30) + 
-        ((df['RSI_14'] - 40) * 2) + 
-        (df['Div_Yield'] * 5)
-    ).round(1)
-    df = df.sort_values(by='Hot_Score', ascending=False)
+if macd_filter != "All":
+    df = df[df['MACD_Status'] == macd_filter]
 
 # -------------------------------------------------------------
-# 6. DASHBOARD DISPLAY
+# 6. DASHBOARD DISPLAY LAYOUT
 # -------------------------------------------------------------
 c1, c2, c3 = st.columns(3)
-c1.metric("Total Universe", len(raw_df))
-c2.metric("Hot Setups Found", len(df))
-survival = (len(df) / len(raw_df)) * 100 if len(raw_df) > 0 else 0
-c3.metric("Funnel Pass Rate", f"{survival:.1f}%")
+c1.metric("Total Universe Evaluated", len(raw_df))
+c2.metric("Qualifying Technical Setups", len(df))
+c3.metric("Screening Efficiency", f"{(len(df)/len(raw_df))*100:.1f}%")
 
 st.markdown("---")
-st.subheader("🏆 Filtered Hot Stocks Ranking")
+st.subheader("📊 Quantitative Indicator Matrix")
 
 if len(df) > 0:
-    # Format view columns
-    view_df = df[[
-        'Ticker', 'Category', 'Close_Price', 'PE_Ratio', 
-        'RSI_14', 'Vol_Spike_Ratio', 'Hot_Score'
-    ]].copy()
-    
-    view_df['Close_Price'] = view_df['Close_Price'].round(2)
-    view_df['PE_Ratio'] = view_df['PE_Ratio'].round(2)
+    view_df = df.copy()
+    view_df['Close'] = view_df['Close'].round(2)
     view_df['RSI_14'] = view_df['RSI_14'].round(1)
-    view_df['Vol_Spike_Ratio'] = view_df['Vol_Spike_Ratio'].round(2)
+    view_df['BB_Upper'] = view_df['BB_Upper'].round(2)
+    view_df['BB_Lower'] = view_df['BB_Lower'].round(2)
+    view_df['ATR_Volatility'] = view_df['ATR_Volatility'].round(2)
+    view_df['Volume_Today'] = view_df['Volume_Today'].astype(int)
     
     st.dataframe(view_df, use_container_width=True)
     
-    # Detailed Stock Inspector
+    # Deep Indicator Breakdown Tool
     st.markdown("---")
-    st.subheader("🔍 Deep Stock Inspector")
-    chosen_stock = st.selectbox("Select a ticker to analyze technical health:", view_df['Ticker'].tolist())
+    st.subheader("🔍 Single Asset Technical Inspector")
+    chosen_ticker = st.selectbox("Select equity identifier:", view_df['Ticker'].tolist())
     
-    if chosen_stock:
-        st_data = df[df['Ticker'] == chosen_stock].iloc[0]
-        col_a, col_b, col_c = st.columns(3)
-        col_a.metric("Current Price", f"{st_data['Close_Price']:.2f} BDT")
-        col_b.metric("RSI Status", f"{st_data['RSI_14']:.1f} ({'Overbought' if st_data['RSI_14']>70 else 'Oversold' if st_data['RSI_14']<30 else 'Neutral'})")
-        col_c.metric("Volume Momentum", f"{st_data['Vol_Spike_Ratio']:.2f}x Average")
+    if chosen_ticker:
+        record = df[df['Ticker'] == chosen_ticker].iloc[0]
+        col_x, col_y, col_z = st.columns(3)
         
-        if st_data['Close_Price'] > st_data['EMA_50']:
-            st.success(f"✅ **{chosen_stock}** is trading above its 50-day Exponential Moving Average, confirming a healthy mid-term technical uptrend.")
+        col_x.metric("Last Price", f"{record['Close']:.2f} BDT")
+        col_y.metric("Average True Range (ATR)", f"{record['ATR_Volatility']:.2f}")
+        col_z.metric("Momentum Status", record['MACD_Status'])
+        
+        # Volatility / Band position evaluation
+        if record['Close'] >= record['BB_Upper'] * 0.98:
+            st.warning(f"⚠️ **{chosen_ticker}** is testing its upper Bollinger Band boundary. Watch for potential overextension or breakout continuation.")
+        elif record['Close'] <= record['BB_Lower'] * 1.02:
+            st.info(f"💡 **{chosen_ticker}** is approaching its lower Bollinger Band support level, indicating potential mean-reversion opportunity.")
         else:
-            st.warning(f"⚠️ **{chosen_stock}** is trading below its 50-day EMA. Exercise caution regarding trend continuation.")
+            st.success(f"✅ **{chosen_ticker}** is trading safely within normal volatility boundaries.")
 else:
-    st.warning("No stocks match your strict technical criteria. Try adjusting your RSI or volume filters in the sidebar.")
+    st.warning("No securities match the selected multi-tier advanced indicators. Adjust parameters in the sidebar.")
